@@ -169,12 +169,15 @@ Common workflows:
 2. Use get_dataset_details() to explore a specific dataset
 3. Use get_analysis_results() to see computational results
 4. Use get_sample_details() for sample information
+5. Use get_infrastructure_resources() to find researchers/sites
+6. Use list_controlled_vocabulary() to check valid filter values
 
 When searching:
 - Use text_query for general searches (minimum 4 characters)
 - Apply filters like species, dataset_types, age_ranges for precision
 - Set include_samples=True to see demographic data
-- Set include_analyses=True to preview available analyses"""
+- Set include_analyses=True to preview available analyses
+- If unsure about filter values, call list_controlled_vocabulary() first"""
 
 @mcp.prompt()
 def analysis_workflow():
@@ -203,12 +206,17 @@ Discovery tips:
 2. Use filters to narrow: species, dataset_types, age_ranges
 3. Include related entities: include_genes=True, include_anatomy=True
 4. Follow up with detailed queries using the IDs found
+5. Use search_media() to find files/images across datasets
 
 Available dataset types:
 - rna_seq, proteomics, imaging, single_cell, atac_seq, chip_seq
 
 Available species:
-- human, mouse"""
+- human, mouse
+
+Media search:
+- Use search_media(media_type="files") for protocols, data files
+- Use search_media(media_type="images") for histology, microscopy"""
 
 # Add resources for API documentation
 @mcp.resource("lungmap://api/base_url")
