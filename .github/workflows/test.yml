@@ -36,3 +36,4 @@ jobs:
       run: |
         python tests/test_tools.py
         python scripts/test_server.py
+

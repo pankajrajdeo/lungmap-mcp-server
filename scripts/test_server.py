@@ -19,8 +19,8 @@ async def test_server():
     
     print("🧪 Testing LungMAP MCP Server\n")
     
-    # Get the absolute path to the server
-    server_path = Path(__file__).parent / "lungmap_mcp_server.py"
+    # Get the absolute path to the server (parent directory)
+    server_path = Path(__file__).parent.parent / "lungmap_mcp_server.py"
     
     server_params = StdioServerParameters(
         command="python3",
