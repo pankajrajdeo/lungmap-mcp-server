@@ -65,6 +65,19 @@ python scripts/test_server.py
 # ✅ All tests passed!
 ```
 
+## 🌐 SSE (Remote) – Optional
+
+Use SSE transport for remote clients (ChatGPT/Claude). See README for full details.
+
+```bash
+# Start SSE server locally
+MCP_TRANSPORT=sse PORT=8000 LUNGMAP_MCP_TOKEN=dev-token \
+python lungmap_mcp_server.py
+
+# Environment variables (see README for more)
+# MCP_TRANSPORT, HOST, PORT, MCP_SSE_PATH, LUNGMAP_MCP_TOKEN, MAX_REQUESTS_PER_MINUTE
+```
+
 ## 🔗 Claude Desktop Integration
 
 ### 1. Locate Config File

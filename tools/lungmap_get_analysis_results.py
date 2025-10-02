@@ -77,11 +77,17 @@ def lungmap_get_analysis_results(
         includes = detail_map.get(inputs.detail_level, {})
         
         def fetch_and_group(endpoint, key, ids):
-            data = make_api_call(endpoint, {"analysis_ids[]": ids, "limit": 1000}, "lungmap_get_analysis_results")
-            if isinstance(data, list):
-                by_analysis = {aid: [] for aid in ids}
-                for item in data: by_analysis.setdefault(item.get('analysis_id'), []).append(item)
-                for a in analyses_data: a[key] = by_analysis.get(a['analysis_id'], [])
+            # Chunk requests to reduce memory and payload sizes
+            chunk_size = 100
+            by_analysis = {aid: [] for aid in ids}
+            for i in range(0, len(ids), chunk_size):
+                chunk = ids[i:i+chunk_size]
+                data = make_api_call(endpoint, {"analysis_ids[]": chunk, "limit": 1000}, "lungmap_get_analysis_results")
+                if isinstance(data, list):
+                    for item in data:
+                        by_analysis.setdefault(item.get('analysis_id'), []).append(item)
+            for a in analyses_data:
+                a[key] = by_analysis.get(a['analysis_id'], [])
 
         if includes.get("entity_sets"): fetch_and_group("/analyses/entity_sets", "entity_sets", analysis_ids_found)
         if includes.get("entities"): fetch_and_group("/analyses/entities", "entities", analysis_ids_found)

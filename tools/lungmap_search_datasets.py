@@ -3,7 +3,7 @@
 # ================================================================================
 
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from langchain_core.tools import tool
 from .api_client import make_api_call, create_standard_response, handle_api_error
@@ -39,6 +39,19 @@ class SearchLungmapDatasetsInput(BaseModel):
     include_analysis_entities: bool = Field(default=False, description="Also return analysis entity results found in search. Adds ~50-100 tokens per entity.")
     include_anatomy: bool = Field(default=False, description="Also return anatomy results found in search. Adds ~50-100 tokens per anatomy term.")
     limit: int = Field(default=5, description=f"Maximum datasets to return. Max value is {MAX_LIMITS['datasets']}.", gt=0, le=MAX_LIMITS["datasets"])
+
+    @field_validator('text_query')
+    @classmethod
+    def sanitize_query(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v2 = v.strip()
+        if not v2:
+            return None
+        forbidden = ['<', '>', ';', '|']
+        if any(ch in v2 for ch in forbidden):
+            raise ValueError("Invalid characters in query")
+        return v2
 
 @tool
 def lungmap_search_datasets(
@@ -118,6 +131,11 @@ def lungmap_search_datasets(
             query_text = ""
         else:
             metadata["warnings"].append(f"Query '{query_text}' is very short. For better results, use longer terms or filters.")
+    # Predefine optional collections to avoid undefined references later
+    gene_results: List[Dict[str, Any]] = []
+    analysis_results: List[Dict[str, Any]] = []
+    anatomy_results: List[Dict[str, Any]] = []
+
     if inputs.dataset_ids:
         params["dataset_ids[]"] = inputs.dataset_ids
     elif query_text and len(query_text) >= 4:
@@ -131,7 +149,7 @@ def lungmap_search_datasets(
                 if r.get('search_category_label') == 'Dataset' and r.get('id')
             ))
             
-            # Check if we found genes or other entities that might be relevant
+            # Collect additional entities that might be relevant
             gene_results = [r for r in search_results if r.get('search_category_label') == 'Gene']
             analysis_results = [r for r in search_results if r.get('search_category_label') == 'Analysis Entity']
             anatomy_results = [r for r in search_results if r.get('search_category_label') == 'Anatomy']
@@ -203,17 +221,20 @@ def lungmap_search_datasets(
                 for s in samples_data: samples_by_dataset.setdefault(s.get('dataset_id'), []).append(s)
                 for d in datasets: d['samples'] = samples_by_dataset.get(d['dataset_id'], [])
         
-        # Add additional entity types if requested
+        # Add additional entity types if requested (always defined lists)
         all_results = datasets.copy()
-        if inputs.include_genes and 'gene_results' in locals():
-            all_results.extend(gene_results[:3])  # Add up to 3 genes
-            metadata["included_genes"] = len(gene_results[:3])
-        if inputs.include_analysis_entities and 'analysis_results' in locals():
-            all_results.extend(analysis_results[:3])  # Add up to 3 analysis entities
-            metadata["included_analysis_entities"] = len(analysis_results[:3])
-        if inputs.include_anatomy and 'anatomy_results' in locals():
-            all_results.extend(anatomy_results[:3])  # Add up to 3 anatomy terms
-            metadata["included_anatomy"] = len(anatomy_results[:3])
+        if inputs.include_genes and gene_results:
+            to_add = gene_results[:3]
+            all_results.extend(to_add)
+            metadata["included_genes"] = len(to_add)
+        if inputs.include_analysis_entities and analysis_results:
+            to_add = analysis_results[:3]
+            all_results.extend(to_add)
+            metadata["included_analysis_entities"] = len(to_add)
+        if inputs.include_anatomy and anatomy_results:
+            to_add = anatomy_results[:3]
+            all_results.extend(to_add)
+            metadata["included_anatomy"] = len(to_add)
             
         return create_standard_response(success=True, data=all_results, query_params=params, metadata=metadata)
     except Exception as e:

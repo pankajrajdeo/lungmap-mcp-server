@@ -21,7 +21,7 @@ Expected output:
 🧪 Testing LungMAP MCP Server
 📡 Connecting to server...
 ✅ Connection established
-🛠️  Available tools: 8
+🛠️  Lists available tools
 ✅ All tests passed!
 ```
 

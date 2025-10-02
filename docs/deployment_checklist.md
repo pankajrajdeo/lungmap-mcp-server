@@ -32,9 +32,9 @@ Pre-deployment checklist for the LungMAP MCP Server.
 
 ### Testing
 - [ ] **Server starts** without errors
-- [ ] **Tools load** successfully (8 tools)
-- [ ] **Prompts available** (3 prompts)
-- [ ] **Resources accessible** (2 resources)
+- [ ] **Tools load** successfully
+- [ ] **Prompts available**
+- [ ] **Resources accessible**
 
 ### Integration
 - [ ] **Claude Desktop restarted** completely
@@ -98,7 +98,7 @@ python -c "import requests; print('✅ API OK' if requests.get('https://www.lung
 
 ### LangChain Tests
 1. **Connection**: MCP client connects successfully
-2. **Tool Loading**: All 8 tools loaded
+2. **Tool Loading**: All tools loaded
 3. **Agent Creation**: LangGraph agent created
 4. **Query Execution**: Basic queries work
 

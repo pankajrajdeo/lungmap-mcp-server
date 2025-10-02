@@ -4,7 +4,14 @@ Provides access to LungMAP API tools via Model Context Protocol
 """
 
 from mcp.server.fastmcp import FastMCP
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+import os
+import json
+import logging
+from collections import deque
+import time
+from fastapi.responses import JSONResponse
+from fastapi import Request
 
 # Import all the tool modules
 from tools.lungmap_search_datasets import lungmap_search_datasets
@@ -16,8 +23,42 @@ from tools.lungmap_get_infrastructure_resources import lungmap_get_infrastructur
 from tools.lungmap_list_controlled_vocabulary import lungmap_list_controlled_vocabulary
 from tools.lungmap_search_media import lungmap_search_media
 
+# Initialize logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("lungmap_mcp")
+
 # Initialize FastMCP server
 mcp = FastMCP("LungMAP")
+
+
+# Simple in-process rate limiter (per-tool), 60 requests/minute
+class SimpleRateLimiter:
+    def __init__(self, max_per_minute: int = 60):
+        self.max_per_minute = max_per_minute
+        self.calls: Dict[str, deque] = {}
+
+    def allow(self, key: str) -> bool:
+        window_start = time.time() - 60
+        q = self.calls.setdefault(key, deque())
+        # Drop old timestamps
+        while q and q[0] < window_start:
+            q.popleft()
+        if len(q) >= self.max_per_minute:
+            return False
+        q.append(time.time())
+        return True
+
+
+_rate_limiter = SimpleRateLimiter(max_per_minute=int(os.getenv("MAX_REQUESTS_PER_MINUTE", "60")))
+
+def _rate_limit_or_error(tool_name: str) -> Dict[str, Any] | None:
+    if not _rate_limiter.allow(tool_name):
+        return {
+            "success": False,
+            "error": f"Rate limit exceeded for {tool_name}. Try again later.",
+            "metadata": {"retry_after_seconds": 60}
+        }
+    return None
 
 # Register all tools using the @mcp.tool() decorator
 @mcp.tool()
@@ -36,6 +77,8 @@ def search_datasets(
     limit: int = 5
 ):
     """Search and filter LungMAP datasets, genes, and other entities. This is the primary discovery tool."""
+    rl = _rate_limit_or_error("search_datasets")
+    if rl: return rl
     return lungmap_search_datasets(
         text_query=text_query,
         dataset_ids=dataset_ids,
@@ -61,6 +104,8 @@ def get_dataset_details(
     response_format: str = "detailed"
 ):
     """Retrieves comprehensive details for a SINGLE dataset, including files, images, and metadata."""
+    rl = _rate_limit_or_error("get_dataset_details")
+    if rl: return rl
     return lungmap_get_dataset_details(
         dataset_id=dataset_id,
         include_images=include_images,
@@ -76,6 +121,8 @@ def get_sample_details(
     response_format: str = "detailed"
 ):
     """Retrieves detailed information for a specific LungMAP sample ID."""
+    rl = _rate_limit_or_error("get_sample_details")
+    if rl: return rl
     return lungmap_get_sample_details(
         sample_id=sample_id,
         response_format=response_format
@@ -89,6 +136,8 @@ def get_analysis_results(
     analyses_limit: int = 5
 ):
     """Get computational analysis results for datasets or specific analysis IDs."""
+    rl = _rate_limit_or_error("get_analysis_results")
+    if rl: return rl
     return lungmap_get_analysis_results(
         analysis_ids=analysis_ids,
         dataset_ids=dataset_ids,
@@ -105,6 +154,8 @@ def get_molecular_entities(
     limit: int = 10
 ):
     """Retrieves detailed information for specific molecular and ontological entities."""
+    rl = _rate_limit_or_error("get_molecular_entities")
+    if rl: return rl
     return lungmap_get_molecular_entities(
         entity_type=entity_type,
         entity_ids=entity_ids,
@@ -122,6 +173,8 @@ def get_infrastructure_resources(
     limit: int = 10
 ):
     """Look up LungMAP infrastructure resources like researchers, sites, and tools."""
+    rl = _rate_limit_or_error("get_infrastructure_resources")
+    if rl: return rl
     return lungmap_get_infrastructure_resources(
         resource_type=resource_type,
         resource_ids=resource_ids,
@@ -136,6 +189,8 @@ def list_controlled_vocabulary(
     response_format: str = "concise"
 ):
     """An internal utility tool to discover valid filter values for other tools."""
+    rl = _rate_limit_or_error("list_controlled_vocabulary")
+    if rl: return rl
     return lungmap_list_controlled_vocabulary(
         category=category,
         response_format=response_format
@@ -150,6 +205,8 @@ def search_media(
     response_format: str = "concise"
 ):
     """Search for files or images across all datasets."""
+    rl = _rate_limit_or_error("search_media")
+    if rl: return rl
     return lungmap_search_media(
         media_type=media_type,
         file_type_ids=file_type_ids,
@@ -157,6 +214,58 @@ def search_media(
         limit=limit,
         response_format=response_format
     )
+
+@mcp.tool()
+def search(query: str, limit: int = 10) -> Dict[str, Any]:
+    """Simplified search returning IDs and titles for generalized consumers (e.g., ChatGPT)."""
+    rl = _rate_limit_or_error("search")
+    if rl: return rl
+    try:
+        res = lungmap_search_datasets(
+            text_query=query,
+            include_genes=True,
+            include_analysis_entities=True,
+            include_anatomy=True,
+            limit=limit,
+        )
+    except Exception as e:
+        return {"success": False, "error": f"search failed: {e}", "query_params": {"query": query, "limit": limit}}
+    items = res.get("data", []) if isinstance(res, dict) else []
+    simplified = []
+    for item in items or []:
+        simplified.append({
+            "id": item.get("dataset_id") or item.get("id"),
+            "title": item.get("label") or item.get("title") or "",
+            "url": f"https://www.lungmap.net/entity/{item.get('dataset_id') or item.get('id') or ''}"
+        })
+    return {"success": True, "data": simplified, "query_params": {"query": query, "limit": limit}}
+
+@mcp.tool()
+def fetch(id: str) -> Dict[str, Any]:
+    """Fetch details for a specific LungMAP resource by ID (datasets primarily)."""
+    try:
+        details = lungmap_get_dataset_details(
+            dataset_id=id,
+            include_files=True,
+            include_images=True,
+            include_resources=False,
+            response_format="detailed",
+        )
+        if not details or not details.get("success"):
+            return {"success": False, "error": f"Not found: {id}", "query_params": {"id": id}}
+        base = details.get("data", {}).get("base_record", {})
+        return {
+            "success": True,
+            "data": {
+                "id": id,
+                "title": base.get("label", ""),
+                "url": f"https://www.lungmap.net/entity/{id}",
+                "record": base,
+            },
+            "query_params": {"id": id}
+        }
+    except Exception as e:
+        return {"success": False, "error": f"fetch failed: {e}", "query_params": {"id": id}}
 
 # Add prompts for common workflows
 @mcp.prompt()
@@ -245,6 +354,38 @@ ID Formats:
 
 For more details: https://www.lungmap.net"""
 
+# Health resource for monitoring
+@mcp.resource("lungmap://health")
+def health_check() -> str:
+    return json.dumps({
+        "status": "healthy",
+        "service": "LungMAP MCP Server",
+        "version": "0.1.0"
+    })
+
 if __name__ == "__main__":
-    # Run the server with stdio transport
-    mcp.run(transport="stdio")
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    if transport == "sse":
+        host = os.getenv("HOST", "0.0.0.0")
+        port = int(os.getenv("PORT", "8000"))
+        path = os.getenv("MCP_SSE_PATH", "/sse")
+        # Optional bearer token auth for SSE
+        token = os.getenv("LUNGMAP_MCP_TOKEN")
+        try:
+            if token:
+                app = mcp.get_app()
+                @app.middleware("http")
+                async def auth_middleware(request: Request, call_next):
+                    if request.url.path.startswith(path):
+                        auth = request.headers.get("authorization", "")
+                        if not auth.startswith("Bearer ") or auth.split(" ", 1)[1] != token:
+                            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+                    return await call_next(request)
+        except Exception:
+            # Fallback silently if app is unavailable in current FastMCP version
+            pass
+        logger.info(f"Starting MCP server (SSE) on {host}:{port}{path}")
+        mcp.run(transport="sse", host=host, port=port, path=path)
+    else:
+        logger.info("Starting MCP server (stdio)")
+        mcp.run(transport="stdio")

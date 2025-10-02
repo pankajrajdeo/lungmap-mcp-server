@@ -72,7 +72,11 @@ def lungmap_get_sample_details(
             concise_dataset = {k: v for k, v in results.get("dataset_record", {}).items() if k in ["dataset_id", "label"]}
             results = {"sample_record": concise_sample, "subject_record": concise_subject, "dataset_record": concise_dataset}
 
-        return create_standard_response(success=True, data=results, query_params=inputs.model_dump(), metadata=metadata)
+        qp = inputs.model_dump()
+        qp['response_format'] = inputs.response_format.value
+        return create_standard_response(success=True, data=results, query_params=qp, metadata=metadata)
         
     except Exception as e:
-        return handle_api_error(e, "lungmap_get_sample_details", inputs.model_dump())
+        qp = inputs.model_dump()
+        qp['response_format'] = inputs.response_format.value
+        return handle_api_error(e, "lungmap_get_sample_details", qp)

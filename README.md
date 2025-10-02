@@ -247,6 +247,124 @@ async with stdio_client(server_params) as (read, write):
 ```
 
 ## 📊 API Reference
+## 🌐 Remote Deployment & Auth
+
+Environment variables:
+
+```bash
+# Transport
+MCP_TRANSPORT=sse   # or stdio
+HOST=0.0.0.0
+PORT=8000
+MCP_SSE_PATH=/sse
+
+# Auth (optional but recommended for SSE)
+LUNGMAP_MCP_TOKEN=your-secret-token
+
+# Rate limiting
+MAX_REQUESTS_PER_MINUTE=60
+```
+
+Run with SSE locally:
+
+```bash
+MCP_TRANSPORT=sse PORT=8000 LUNGMAP_MCP_TOKEN=dev-token \
+python lungmap_mcp_server.py
+```
+
+Health/resource checks via MCP client:
+
+```python
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+# For SSE, use appropriate client/URL; below shows stdio example
+```
+
+Security & limits:
+- Bearer token required if `LUNGMAP_MCP_TOKEN` set.
+- Per-tool rate limit defaults to 60 req/min; configure via env.
+- Responses soft-capped at ~100KB; narrow queries or reduce limits if exceeded.
+
+## 🤝 Connect Clients (ChatGPT, Claude, Cursor)
+
+### ChatGPT (MCP over SSE)
+
+1) Start server with SSE and token (see above)
+
+2) Use the OpenAI Responses API with MCP tools (example):
+
+```bash
+curl https://api.openai.com/v1/responses \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "o4-mini",
+    "input": "Find human RNA-seq datasets about lung development",
+    "tools": [{
+      "type": "mcp",
+      "server_label": "lungmap",
+      "server_url": "http://localhost:8000/sse",
+      "allowed_tools": ["search", "search_datasets", "get_dataset_details", "get_sample_details", "get_analysis_results", "get_molecular_entities", "get_infrastructure_resources", "list_controlled_vocabulary", "search_media", "fetch"],
+      "require_approval": "never",
+      "metadata": {
+        "headers": {"Authorization": "Bearer dev-token"}
+      }
+    }]
+  }'
+```
+
+Notes:
+- `search`/`fetch` are provided for generic connectors; domain tools are also available.
+- Pass the same Bearer token via `metadata.headers.Authorization`.
+
+### Claude Desktop (Remote via @modelcontextprotocol/client)
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "lungmap-remote": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/client", "http://localhost:8000/sse"],
+      "env": {
+        "AUTHORIZATION": "Bearer dev-token"
+      }
+    }
+  }
+}
+```
+
+Then restart Claude Desktop and verify the MCP server is connected.
+
+### Cursor / Local stdio
+
+Add a local stdio server entry in your settings or run:
+
+```bash
+python lungmap_mcp_server.py   # stdio mode
+```
+
+Use the domain tools directly (e.g., `search_datasets`) from your agent.
+
+## 🧪 Testing (stdio & SSE)
+
+- Stdio test:
+
+```bash
+python scripts/test_server.py
+```
+
+- SSE integration tests (optional):
+
+```bash
+MCP_TRANSPORT=sse PORT=8000 LUNGMAP_MCP_TOKEN=dev-token \
+python lungmap_mcp_server.py &
+
+TEST_SSE_BASE=http://localhost:8000 pytest -q tests/test_remote.py
+```
+
 
 ### Base URL
 `https://www.lungmap.net/api`
