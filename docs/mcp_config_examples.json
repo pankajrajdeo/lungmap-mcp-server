@@ -1,0 +1,104 @@
+{
+  "_comment": "MCP Configuration Examples for LungMAP Server",
+  "_instructions": "Choose the appropriate configuration for your use case and copy to your MCP client config",
+  
+  "claude_desktop": {
+    "_comment": "For Claude Desktop application",
+    "_location_macos": "~/Library/Application Support/Claude/claude_desktop_config.json",
+    "_location_windows": "%APPDATA%\\Claude\\claude_desktop_config.json",
+    "mcpServers": {
+      "lungmap": {
+        "command": "python3",
+        "args": ["/absolute/path/to/lungmap_mcp_server.py"]
+      }
+    }
+  },
+  
+  "claude_desktop_with_venv": {
+    "_comment": "If using a virtual environment",
+    "mcpServers": {
+      "lungmap": {
+        "command": "/absolute/path/to/venv/bin/python",
+        "args": ["/absolute/path/to/lungmap_mcp_server.py"]
+      }
+    }
+  },
+  
+  "langchain_stdio": {
+    "_comment": "For LangChain with stdio transport",
+    "_usage": "Use in Python code with StdioServerParameters",
+    "server_params": {
+      "command": "python3",
+      "args": ["/absolute/path/to/lungmap_mcp_server.py"],
+      "transport": "stdio"
+    }
+  },
+  
+  "multi_server_example": {
+    "_comment": "Example with multiple MCP servers including LungMAP",
+    "mcpServers": {
+      "lungmap": {
+        "command": "python3",
+        "args": ["/absolute/path/to/lungmap_mcp_server.py"]
+      },
+      "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/files"]
+      },
+      "brave-search": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+        "env": {
+          "BRAVE_API_KEY": "your-api-key"
+        }
+      }
+    }
+  },
+  
+  "docker_example": {
+    "_comment": "If running in Docker (example only, Dockerfile not provided)",
+    "mcpServers": {
+      "lungmap": {
+        "command": "docker",
+        "args": [
+          "run",
+          "--rm",
+          "-i",
+          "lungmap-mcp-server:latest"
+        ]
+      }
+    }
+  },
+  
+  "uv_example": {
+    "_comment": "Using uv to run the server with dependencies",
+    "mcpServers": {
+      "lungmap": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--with", "mcp>=1.9.1",
+          "--with", "requests>=2.31.0",
+          "--with", "pydantic>=2.0.0",
+          "--with", "langchain-core>=0.1.0",
+          "/absolute/path/to/lungmap_mcp_server.py"
+        ]
+      }
+    }
+  },
+  
+  "development_mode": {
+    "_comment": "For development with verbose logging",
+    "_note": "Add logging to server file for this to work",
+    "mcpServers": {
+      "lungmap": {
+        "command": "python3",
+        "args": ["-u", "/absolute/path/to/lungmap_mcp_server.py"],
+        "env": {
+          "PYTHONUNBUFFERED": "1",
+          "LOG_LEVEL": "DEBUG"
+        }
+      }
+    }
+  }
+}

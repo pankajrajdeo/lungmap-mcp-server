@@ -1,0 +1,35 @@
+[project]
+name = "lungmap-mcp-server"
+version = "0.1.0"
+description = "MCP server for LungMAP API tools"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.9.1",
+    "requests>=2.31.0",
+    "pydantic>=2.0.0",
+    "langchain-core>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tools*", "lungmap_mcp_server"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
