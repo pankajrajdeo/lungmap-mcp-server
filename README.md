@@ -66,45 +66,92 @@ Add to your Claude Desktop config:
 - **`lungmap://api/base_url`** - API base URL reference
 - **`lungmap://api/documentation`** - Complete API documentation
 
-## 💡 Usage Examples
+## 💡 Usage Examples (MCP)
 
-### Search for Datasets
+Below are examples that use the MCP protocol. Tools are executed via an MCP client, not by importing Python functions directly.
+
+### 1) Using Claude Desktop (No code)
+- Add the server in Claude Desktop config (see Quick Start)
+- Then ask natural language queries like:
+  - "Find human RNA-seq datasets about lung development"
+  - "Get details for dataset LMEX0000000661 including files and images"
+  - "Search everything about ACE2"
+
+Claude will call the MCP tools (e.g., `search_datasets`, `get_dataset_details`) behind the scenes.
+
+### 2) Using the MCP Python Client (stdio)
 ```python
-search_datasets(
-    text_query="lung development",
-    species="human", 
-    dataset_types=["rna_seq"],
-    limit=5
-)
+import asyncio
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+async def main():
+    server_params = StdioServerParameters(
+        command="python3",
+        args=["/absolute/path/to/lungmap_mcp_server.py"],
+    )
+
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            # Initialize the session
+            await session.initialize()
+
+            # Call a tool: search_datasets
+            result = await session.call_tool(
+                "search_datasets",
+                arguments={
+                    "text_query": "lung development",
+                    "species": "human",
+                    "dataset_types": ["rna_seq"],
+                    "limit": 5,
+                },
+            )
+            print(result.content)
+
+            # Call a tool: get_dataset_details
+            details = await session.call_tool(
+                "get_dataset_details",
+                arguments={
+                    "dataset_id": "LMEX0000000661",
+                    "include_files": True,
+                    "include_images": True,
+                    "include_resources": True,
+                },
+            )
+            print(details.content)
+
+asyncio.run(main())
 ```
 
-### Comprehensive Gene Search
+### 3) Using LangChain MCP Adapters
 ```python
-search_datasets(
-    text_query="ACE2",
-    include_genes=True,
-    include_analysis_entities=True,
-    include_anatomy=True
-)
-```
+import asyncio
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langgraph.prebuilt import create_react_agent
 
-### Get Dataset Details
-```python
-get_dataset_details(
-    dataset_id="LMEX0000000661",
-    include_files=True,
-    include_images=True,
-    include_resources=True
-)
-```
+async def main():
+    server_params = StdioServerParameters(
+        command="python3",
+        args=["/absolute/path/to/lungmap_mcp_server.py"],
+    )
 
-### Explore Analysis Results
-```python
-get_analysis_results(
-    dataset_ids=["LMEX0000000661"],
-    detail_level="comprehensive",
-    analyses_limit=5
-)
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+
+            # Load all MCP tools as LangChain tools
+            tools = await load_mcp_tools(session)
+
+            # Create a ReAct agent and invoke it
+            agent = create_react_agent("openai:gpt-4o-mini", tools)
+            response = await agent.ainvoke({
+                "messages": [{"role": "user", "content": "Search everything about ACE2"}]
+            })
+            print(response)
+
+asyncio.run(main())
 ```
 
 ## 📁 Project Structure

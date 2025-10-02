@@ -1,0 +1,14 @@
+# LungMAP MCP Server Dependencies
+# Core MCP and API dependencies
+mcp>=1.9.1
+requests>=2.31.0
+pydantic>=2.0.0
+langchain-core>=0.1.0
+
+# Optional development dependencies
+# Uncomment for development:
+# pytest>=7.0.0
+# black>=23.0.0
+# ruff>=0.1.0
+# langchain-mcp-adapters>=0.1.0
+# langgraph>=0.1.0
