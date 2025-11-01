@@ -8,6 +8,10 @@ A **Model Context Protocol (MCP) server** that provides AI assistants with power
 
 ## 🚀 Quick Start
 
+### 🎥 Demo
+
+[▶️ Watch the LungMAP MCP walkthrough](lungmap_mcp.mov)
+
 ### 1. Clone & Install
 
 ```bash

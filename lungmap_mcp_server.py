@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 LungMAP MCP Server
 Provides access to LungMAP API tools via Model Context Protocol
@@ -10,18 +11,16 @@ import json
 import logging
 from collections import deque
 import time
-from fastapi.responses import JSONResponse
-from fastapi import Request
 
-# Import all the tool modules
-from tools.lungmap_search_datasets import lungmap_search_datasets
-from tools.lungmap_get_dataset_details import lungmap_get_dataset_details
-from tools.lungmap_get_sample_details import lungmap_get_sample_details
-from tools.lungmap_get_analysis_results import lungmap_get_analysis_results
-from tools.lungmap_get_molecular_entities import lungmap_get_molecular_entities
-from tools.lungmap_get_infrastructure_resources import lungmap_get_infrastructure_resources
-from tools.lungmap_list_controlled_vocabulary import lungmap_list_controlled_vocabulary
-from tools.lungmap_search_media import lungmap_search_media
+# Import the tool functions directly
+from tools.lungmap_search_datasets import lungmap_search_datasets as search_tool
+from tools.lungmap_get_dataset_details import lungmap_get_dataset_details as details_tool
+from tools.lungmap_get_sample_details import lungmap_get_sample_details as sample_tool
+from tools.lungmap_get_analysis_results import lungmap_get_analysis_results as analysis_tool
+from tools.lungmap_get_molecular_entities import lungmap_get_molecular_entities as molecular_tool
+from tools.lungmap_get_infrastructure_resources import lungmap_get_infrastructure_resources as infra_tool
+from tools.lungmap_list_controlled_vocabulary import lungmap_list_controlled_vocabulary as vocab_tool
+from tools.lungmap_search_media import lungmap_search_media as media_tool
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -61,10 +60,19 @@ def _rate_limit_or_error(tool_name: str) -> Dict[str, Any] | None:
     return None
 
 # Register all tools using the @mcp.tool() decorator
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_search_datasets",
+    annotations={
+        "title": "LungMAP Dataset Search",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def search_datasets(
     text_query: Optional[str] = None,
-    dataset_ids: Optional[List[str]] = None,
+    dataset_ids: Optional[str] = None,
     species: Optional[str] = None,
     dataset_types: Optional[List[str]] = None,
     sample_age_ranges: Optional[List[str]] = None,
@@ -79,7 +87,8 @@ def search_datasets(
     """Search and filter LungMAP datasets, genes, and other entities. This is the primary discovery tool."""
     rl = _rate_limit_or_error("search_datasets")
     if rl: return rl
-    return lungmap_search_datasets(
+    # Call the underlying function from the decorated tool
+    return search_tool.func(
         text_query=text_query,
         dataset_ids=dataset_ids,
         species=species,
@@ -94,7 +103,16 @@ def search_datasets(
         limit=limit
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_get_dataset_details",
+    annotations={
+        "title": "LungMAP Dataset Details",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def get_dataset_details(
     dataset_id: str,
     include_images: bool = False,
@@ -106,7 +124,7 @@ def get_dataset_details(
     """Retrieves comprehensive details for a SINGLE dataset, including files, images, and metadata."""
     rl = _rate_limit_or_error("get_dataset_details")
     if rl: return rl
-    return lungmap_get_dataset_details(
+    return details_tool.func(
         dataset_id=dataset_id,
         include_images=include_images,
         include_image_files=include_image_files,
@@ -115,7 +133,16 @@ def get_dataset_details(
         response_format=response_format
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_get_sample_details",
+    annotations={
+        "title": "LungMAP Sample Details",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def get_sample_details(
     sample_id: str,
     response_format: str = "detailed"
@@ -123,12 +150,21 @@ def get_sample_details(
     """Retrieves detailed information for a specific LungMAP sample ID."""
     rl = _rate_limit_or_error("get_sample_details")
     if rl: return rl
-    return lungmap_get_sample_details(
+    return sample_tool.func(
         sample_id=sample_id,
         response_format=response_format
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_get_analysis_results",
+    annotations={
+        "title": "LungMAP Analysis Results",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def get_analysis_results(
     analysis_ids: Optional[List[str]] = None,
     dataset_ids: Optional[List[str]] = None,
@@ -138,14 +174,23 @@ def get_analysis_results(
     """Get computational analysis results for datasets or specific analysis IDs."""
     rl = _rate_limit_or_error("get_analysis_results")
     if rl: return rl
-    return lungmap_get_analysis_results(
+    return analysis_tool.func(
         analysis_ids=analysis_ids,
         dataset_ids=dataset_ids,
         detail_level=detail_level,
         analyses_limit=analyses_limit
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_get_molecular_entities",
+    annotations={
+        "title": "LungMAP Molecular Entities",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def get_molecular_entities(
     entity_type: str,
     entity_ids: Optional[List[str]] = None,
@@ -156,7 +201,7 @@ def get_molecular_entities(
     """Retrieves detailed information for specific molecular and ontological entities."""
     rl = _rate_limit_or_error("get_molecular_entities")
     if rl: return rl
-    return lungmap_get_molecular_entities(
+    return molecular_tool.func(
         entity_type=entity_type,
         entity_ids=entity_ids,
         include_members=include_members,
@@ -164,7 +209,16 @@ def get_molecular_entities(
         limit=limit
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_get_infrastructure_resources",
+    annotations={
+        "title": "LungMAP Infrastructure Resources",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def get_infrastructure_resources(
     resource_type: str,
     resource_ids: Optional[List[str]] = None,
@@ -175,7 +229,7 @@ def get_infrastructure_resources(
     """Look up LungMAP infrastructure resources like researchers, sites, and tools."""
     rl = _rate_limit_or_error("get_infrastructure_resources")
     if rl: return rl
-    return lungmap_get_infrastructure_resources(
+    return infra_tool.func(
         resource_type=resource_type,
         resource_ids=resource_ids,
         site_ids=site_ids,
@@ -183,7 +237,16 @@ def get_infrastructure_resources(
         limit=limit
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_list_controlled_vocabulary",
+    annotations={
+        "title": "LungMAP Controlled Vocabulary",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def list_controlled_vocabulary(
     category: str,
     response_format: str = "concise"
@@ -191,12 +254,21 @@ def list_controlled_vocabulary(
     """An internal utility tool to discover valid filter values for other tools."""
     rl = _rate_limit_or_error("list_controlled_vocabulary")
     if rl: return rl
-    return lungmap_list_controlled_vocabulary(
+    return vocab_tool.func(
         category=category,
         response_format=response_format
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_search_media",
+    annotations={
+        "title": "LungMAP Media Search",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def search_media(
     media_type: str,
     file_type_ids: Optional[List[str]] = None,
@@ -207,7 +279,7 @@ def search_media(
     """Search for files or images across all datasets."""
     rl = _rate_limit_or_error("search_media")
     if rl: return rl
-    return lungmap_search_media(
+    return media_tool.func(
         media_type=media_type,
         file_type_ids=file_type_ids,
         omero_ids=omero_ids,
@@ -215,13 +287,22 @@ def search_media(
         response_format=response_format
     )
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_general_search",
+    annotations={
+        "title": "LungMAP General Search",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def search(query: str, limit: int = 10) -> Dict[str, Any]:
     """Simplified search returning IDs and titles for generalized consumers (e.g., ChatGPT)."""
     rl = _rate_limit_or_error("search")
     if rl: return rl
     try:
-        res = lungmap_search_datasets(
+        res = search_tool.func(
             text_query=query,
             include_genes=True,
             include_analysis_entities=True,
@@ -240,11 +321,20 @@ def search(query: str, limit: int = 10) -> Dict[str, Any]:
         })
     return {"success": True, "data": simplified, "query_params": {"query": query, "limit": limit}}
 
-@mcp.tool()
+@mcp.tool(
+    name="lungmap_fetch_resource",
+    annotations={
+        "title": "LungMAP Fetch Resource",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 def fetch(id: str) -> Dict[str, Any]:
     """Fetch details for a specific LungMAP resource by ID (datasets primarily)."""
     try:
-        details = lungmap_get_dataset_details(
+        details = details_tool.func(
             dataset_id=id,
             include_files=True,
             include_images=True,
@@ -364,28 +454,6 @@ def health_check() -> str:
     })
 
 if __name__ == "__main__":
-    transport = os.getenv("MCP_TRANSPORT", "stdio")
-    if transport == "sse":
-        host = os.getenv("HOST", "0.0.0.0")
-        port = int(os.getenv("PORT", "8000"))
-        path = os.getenv("MCP_SSE_PATH", "/sse")
-        # Optional bearer token auth for SSE
-        token = os.getenv("LUNGMAP_MCP_TOKEN")
-        try:
-            if token:
-                app = mcp.get_app()
-                @app.middleware("http")
-                async def auth_middleware(request: Request, call_next):
-                    if request.url.path.startswith(path):
-                        auth = request.headers.get("authorization", "")
-                        if not auth.startswith("Bearer ") or auth.split(" ", 1)[1] != token:
-                            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-                    return await call_next(request)
-        except Exception:
-            # Fallback silently if app is unavailable in current FastMCP version
-            pass
-        logger.info(f"Starting MCP server (SSE) on {host}:{port}{path}")
-        mcp.run(transport="sse", host=host, port=port, path=path)
-    else:
-        logger.info("Starting MCP server (stdio)")
-        mcp.run(transport="stdio")
+    # Run the MCP server (stdio transport for Claude Desktop)
+    logger.info("Starting LungMAP MCP server (stdio)")
+    mcp.run()
